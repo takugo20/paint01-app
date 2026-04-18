@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>お絵描きソフト</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #f4f6f8;
+      color: #222;
+    }
+
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 28px;
+      text-align: center;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    input[type="color"] {
+      width: 48px;
+      height: 40px;
+      border: none;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    input[type="range"] {
+      width: 160px;
+      cursor: pointer;
+    }
+
+    .size-value {
+      min-width: 28px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    button {
+      height: 40px;
+      padding: 0 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .canvas-wrap {
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 70vh;
+      min-height: 420px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #555;
+      text-align: center;
+    }
+
+    @media (max-width: 640px) {
+      .toolbar {
+        justify-content: flex-start;
+      }
+
+      .tool-group {
+        width: 100%;
+      }
+
+      input[type="range"] {
+        flex: 1;
+      }
+
+      canvas {
+        height: 60vh;
+        min-height: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>お絵描きソフト</h1>
+
+    <div class="toolbar">
+      <div class="tool-group">
+        <label for="colorPicker">色</label>
+        <input type="color" id="colorPicker" value="#000000" />
+      </div>
+
+      <div class="tool-group">
+        <label for="brushSize">太さ</label>
+        <input type="range" id="brushSize" min="1" max="50" value="5" />
+        <span class="size-value" id="sizeValue">5</span>
+      </div>
+
+      <div class="tool-group">
+        <button id="clearBtn">クリア</button>
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="drawCanvas"></canvas>
+      <div class="note">マウスでもタッチでも描けます</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("drawCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const colorPicker = document.getElementById("colorPicker");
+    const brushSize = document.getElementById("brushSize");
+    const sizeValue = document.getElementById("sizeValue");
+    const clearBtn = document.getElementById("clearBtn");
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = colorPicker.value;
+      ctx.lineWidth = Number(brushSize.value);
+    }
+
+    function getCanvasPosition(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+
+    function startDrawing(e) {
+      isDrawing = true;
+
+      const pos = getCanvasPosition(e);
+      lastX = pos.x;
+      lastY = pos.y;
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+
+      const pos = getCanvasPosition(e);
+
+      ctx.strokeStyle = colorPicker.value;
+      ctx.lineWidth = Number(brushSize.value);
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+
+      lastX = pos.x;
+      lastY = pos.y;
+    }
+
+    function stopDrawing() {
+      isDrawing = false;
+    }
+
+    colorPicker.addEventListener("input", () => {
+      ctx.strokeStyle = colorPicker.value;
+    });
+
+    brushSize.addEventListener("input", () => {
+      sizeValue.textContent = brushSize.value;
+      ctx.lineWidth = Number(brushSize.value);
+    });
+
+    clearBtn.addEventListener("click", () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    });
+
+    canvas.addEventListener("pointerdown", (e) => {
+      startDrawing(e);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      draw(e);
+    });
+
+    canvas.addEventListener("pointerup", stopDrawing);
+    canvas.addEventListener("pointerleave", stopDrawing);
+    canvas.addEventListener("pointercancel", stopDrawing);
+
+    window.addEventListener("resize", resizeCanvas);
+
+    resizeCanvas();
+  </script>
+</body>
+</html>
