@@ -94,7 +94,7 @@
 
     .icon-buttons {
       display: grid;
-      grid-template-columns: repeat(5, 56px);
+      grid-template-columns: repeat(6, 56px);
       gap: 10px;
     }
 
@@ -161,7 +161,7 @@
       font-size: 13px;
       color: #555;
       margin-bottom: 10px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .viewport {
@@ -197,6 +197,11 @@
       text-align: center;
       font-size: 12px;
       color: #555;
+      line-height: 1.5;
+    }
+
+    .hidden-file-input {
+      display: none;
     }
 
     @media (max-width: 900px) {
@@ -218,7 +223,7 @@
       }
 
       .icon-buttons {
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(6, 1fr);
         width: 100%;
       }
 
@@ -286,6 +291,14 @@
             </svg>
           </button>
 
+          <button id="loadBtn" class="icon-btn sub" aria-label="画像読込" title="画像読込">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 16V5"></path>
+              <path d="M8 9l4-4 4 4"></path>
+              <path d="M5 19h14"></path>
+            </svg>
+          </button>
+
           <button id="saveBtn" class="icon-btn sub" aria-label="保存" title="保存">
             <svg viewBox="0 0 24 24">
               <path d="M6 4h9l3 3v13H6z"></path>
@@ -308,7 +321,7 @@
     <div class="canvas-wrap">
       <div class="canvas-info">
         1本指 / マウスで描画<br />
-        2本指でピンチ拡大縮小
+        2本指でピンチ拡大縮小・2本指ドラッグで移動
       </div>
 
       <div id="viewport" class="viewport">
@@ -320,6 +333,8 @@
       <div class="status-bar" id="statusBar">倍率: 100%</div>
     </div>
   </div>
+
+  <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" />
 
   <script>
     const viewport = document.getElementById("viewport");
@@ -335,8 +350,10 @@
     const penBtn = document.getElementById("penBtn");
     const eraserBtn = document.getElementById("eraserBtn");
     const undoBtn = document.getElementById("undoBtn");
+    const loadBtn = document.getElementById("loadBtn");
     const saveBtn = document.getElementById("saveBtn");
     const clearBtn = document.getElementById("clearBtn");
+    const fileInput = document.getElementById("fileInput");
 
     let isDrawing = false;
     let currentTool = "pen";
@@ -353,13 +370,17 @@
     const MAX_SCALE = 4;
 
     const activePointers = new Map();
-    let pinchStartDistance = 0;
-    let pinchStartScale = 1;
-    let pinchCenterX = 0;
-    let pinchCenterY = 0;
-    let pinchCanvasX = 0;
-    let pinchCanvasY = 0;
-    let isPinching = false;
+    let isGestureMode = false;
+
+    let gestureStartDistance = 0;
+    let gestureStartScale = 1;
+    let gestureStartTranslateX = 0;
+    let gestureStartTranslateY = 0;
+    let gestureStartCenterX = 0;
+    let gestureStartCenterY = 0;
+    let gestureStartCanvasX = 0;
+    let gestureStartCanvasY = 0;
+
     let resizeTimer = null;
 
     function setContextStyle() {
@@ -419,18 +440,6 @@
       updateToolButtons();
     }
 
-    function updateTransform() {
-      stage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-      statusBar.textContent = `倍率: ${Math.round(scale * 100)}%`;
-    }
-
-    function centerCanvas() {
-      const viewportRect = viewport.getBoundingClientRect();
-      translateX = Math.max(0, (viewportRect.width - canvas.width * scale) / 2);
-      translateY = Math.max(0, (viewportRect.height - canvas.height * scale) / 2);
-      updateTransform();
-    }
-
     function clampScale(value) {
       return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
     }
@@ -448,6 +457,18 @@
       };
     }
 
+    function updateTransform() {
+      stage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      statusBar.textContent = `倍率: ${Math.round(scale * 100)}% / 位置: ${Math.round(translateX)}, ${Math.round(translateY)}`;
+    }
+
+    function centerCanvas() {
+      const viewportRect = viewport.getBoundingClientRect();
+      translateX = Math.max(0, (viewportRect.width - canvas.width * scale) / 2);
+      translateY = Math.max(0, (viewportRect.height - canvas.height * scale) / 2);
+      updateTransform();
+    }
+
     function getCanvasPositionFromClient(clientX, clientY) {
       const viewportRect = viewport.getBoundingClientRect();
       return {
@@ -460,43 +481,61 @@
       return getCanvasPositionFromClient(e.clientX, e.clientY);
     }
 
-    function beginPinch() {
+    function beginGesture() {
       const pointers = Array.from(activePointers.values());
       if (pointers.length < 2) return;
 
-      isPinching = true;
+      isGestureMode = true;
       isDrawing = false;
 
       const p1 = pointers[0];
       const p2 = pointers[1];
-
-      pinchStartDistance = getPointerDistance(p1, p2);
-      pinchStartScale = scale;
-
       const center = getPointerCenter(p1, p2);
-      pinchCenterX = center.x;
-      pinchCenterY = center.y;
+
+      gestureStartDistance = getPointerDistance(p1, p2);
+      gestureStartScale = scale;
+      gestureStartTranslateX = translateX;
+      gestureStartTranslateY = translateY;
+      gestureStartCenterX = center.x;
+      gestureStartCenterY = center.y;
 
       const canvasPos = getCanvasPositionFromClient(center.x, center.y);
-      pinchCanvasX = canvasPos.x;
-      pinchCanvasY = canvasPos.y;
+      gestureStartCanvasX = canvasPos.x;
+      gestureStartCanvasY = canvasPos.y;
     }
 
-    function updatePinch() {
+    function updateGesture() {
       const pointers = Array.from(activePointers.values());
       if (pointers.length < 2) return;
 
       const p1 = pointers[0];
       const p2 = pointers[1];
-
+      const center = getPointerCenter(p1, p2);
       const currentDistance = getPointerDistance(p1, p2);
-      if (pinchStartDistance === 0) return;
 
-      scale = clampScale(pinchStartScale * (currentDistance / pinchStartDistance));
+      let nextScale = gestureStartScale;
+      if (gestureStartDistance > 0) {
+        nextScale = clampScale(gestureStartScale * (currentDistance / gestureStartDistance));
+      }
 
       const viewportRect = viewport.getBoundingClientRect();
-      translateX = pinchCenterX - viewportRect.left - pinchCanvasX * scale;
-      translateY = pinchCenterY - viewportRect.top - pinchCanvasY * scale;
+      const centerMoveX = center.x - gestureStartCenterX;
+      const centerMoveY = center.y - gestureStartCenterY;
+
+      scale = nextScale;
+      translateX =
+        gestureStartTranslateX +
+        centerMoveX +
+        (gestureStartCanvasX * gestureStartScale - gestureStartCanvasX * scale);
+
+      translateY =
+        gestureStartTranslateY +
+        centerMoveY +
+        (gestureStartCanvasY * gestureStartScale - gestureStartCanvasY * scale);
+
+      // viewport基準に補正
+      translateX += 0;
+      translateY += 0;
 
       updateTransform();
     }
@@ -510,7 +549,7 @@
     }
 
     function draw(e) {
-      if (!isDrawing || isPinching) return;
+      if (!isDrawing || isGestureMode) return;
 
       const pos = getCanvasPosition(e);
       setContextStyle();
@@ -540,6 +579,49 @@
       link.href = canvas.toDataURL("image/png");
       link.download = "oekaki.png";
       link.click();
+    }
+
+    function fitImageToCanvas(img) {
+      const canvasRatio = canvas.width / canvas.height;
+      const imageRatio = img.width / img.height;
+
+      let drawWidth;
+      let drawHeight;
+      let drawX;
+      let drawY;
+
+      if (imageRatio > canvasRatio) {
+        drawWidth = canvas.width;
+        drawHeight = canvas.width / imageRatio;
+        drawX = 0;
+        drawY = (canvas.height - drawHeight) / 2;
+      } else {
+        drawHeight = canvas.height;
+        drawWidth = canvas.height * imageRatio;
+        drawY = 0;
+        drawX = (canvas.width - drawWidth) / 2;
+      }
+
+      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    function loadImageFile(file) {
+      if (!file) return;
+      if (!file.type.startsWith("image/")) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          saveHistory();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          fillCanvasWhite();
+          fitImageToCanvas(img);
+          setContextStyle();
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
     }
 
     function resizeCanvasPreserve() {
@@ -590,6 +672,10 @@
       undo();
     });
 
+    loadBtn.addEventListener("click", () => {
+      fileInput.click();
+    });
+
     saveBtn.addEventListener("click", () => {
       saveImage();
     });
@@ -598,17 +684,23 @@
       clearCanvas();
     });
 
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      loadImageFile(file);
+      fileInput.value = "";
+    });
+
     canvas.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       canvas.setPointerCapture(e.pointerId);
       activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
 
-      if (activePointers.size === 2) {
-        beginPinch();
+      if (activePointers.size >= 2) {
+        beginGesture();
         return;
       }
 
-      if (activePointers.size === 1 && !isPinching) {
+      if (activePointers.size === 1 && !isGestureMode) {
         startDrawing(e);
       }
     });
@@ -621,10 +713,10 @@
       }
 
       if (activePointers.size >= 2) {
-        if (!isPinching) {
-          beginPinch();
+        if (!isGestureMode) {
+          beginGesture();
         }
-        updatePinch();
+        updateGesture();
         return;
       }
 
@@ -636,7 +728,7 @@
       activePointers.delete(e.pointerId);
 
       if (activePointers.size < 2) {
-        isPinching = false;
+        isGestureMode = false;
       }
 
       stopDrawing();
