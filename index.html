@@ -349,6 +349,7 @@
     const fileInput = document.getElementById("fileInput");
 
     let isDrawing = false;
+    let strokeChanged = false;
     let currentTool = "pen";
     let lastX = 0;
     let lastY = 0;
@@ -480,6 +481,7 @@
 
       isGestureMode = true;
       isDrawing = false;
+      strokeChanged = false;
 
       const p1 = pointers[0];
       const p2 = pointers[1];
@@ -531,9 +533,9 @@
     function startDrawing(e) {
       const pos = getCanvasPosition(e);
       isDrawing = true;
+      strokeChanged = false;
       lastX = pos.x;
       lastY = pos.y;
-      saveHistory();
     }
 
     function draw(e) {
@@ -549,10 +551,15 @@
 
       lastX = pos.x;
       lastY = pos.y;
+      strokeChanged = true;
     }
 
     function stopDrawing() {
+      if (isDrawing && strokeChanged) {
+        saveHistory();
+      }
       isDrawing = false;
+      strokeChanged = false;
     }
 
     function clearCanvas() {
@@ -601,11 +608,11 @@
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
-          saveHistory();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           fillCanvasWhite();
           fitImageToCanvas(img);
           setContextStyle();
+          saveHistory();
         };
         img.src = reader.result;
       };
