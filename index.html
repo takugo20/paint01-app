@@ -9,17 +9,23 @@
       box-sizing: border-box;
     }
 
+    html,
     body {
       margin: 0;
+      padding: 0;
       font-family: sans-serif;
       background: #f4f6f8;
       color: #222;
     }
 
+    body {
+      -webkit-text-size-adjust: 100%;
+    }
+
     .app {
       max-width: 1100px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 16px;
     }
 
     h1 {
@@ -47,9 +53,14 @@
       gap: 8px;
     }
 
+    .tool-group.grow {
+      flex: 1 1 220px;
+    }
+
     label {
       font-size: 14px;
       font-weight: bold;
+      white-space: nowrap;
     }
 
     input[type="color"] {
@@ -62,30 +73,39 @@
     }
 
     input[type="range"] {
-      width: 160px;
+      width: 180px;
       cursor: pointer;
     }
 
     .size-value {
-      min-width: 28px;
+      min-width: 32px;
       text-align: center;
       font-weight: bold;
     }
 
     button {
-      height: 40px;
+      height: 42px;
       padding: 0 16px;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       background: #2563eb;
       color: #fff;
       font-size: 14px;
       font-weight: bold;
       cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
     }
 
     button:hover {
-      opacity: 0.9;
+      opacity: 0.92;
+    }
+
+    button.active {
+      background: #111827;
+    }
+
+    button.sub {
+      background: #475569;
     }
 
     .canvas-wrap {
@@ -114,22 +134,69 @@
       text-align: center;
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
+      .app {
+        padding: 12px;
+      }
+
+      h1 {
+        font-size: 24px;
+        margin-bottom: 12px;
+      }
+
       .toolbar {
-        justify-content: flex-start;
+        align-items: stretch;
+        justify-content: stretch;
+        gap: 10px;
+        padding: 12px;
       }
 
       .tool-group {
         width: 100%;
       }
 
+      .tool-group.grow {
+        flex: 1 1 100%;
+      }
+
+      .tool-group.buttons {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      .tool-group.buttons button {
+        width: 100%;
+      }
+
       input[type="range"] {
         flex: 1;
+        width: auto;
+      }
+
+      button {
+        min-height: 46px;
+        font-size: 15px;
       }
 
       canvas {
-        height: 60vh;
+        height: 58vh;
         min-height: 320px;
+      }
+
+      .note {
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .tool-group.buttons {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      canvas {
+        height: 54vh;
+        min-height: 280px;
       }
     }
   </style>
@@ -144,20 +211,24 @@
         <input type="color" id="colorPicker" value="#000000" />
       </div>
 
-      <div class="tool-group">
+      <div class="tool-group grow">
         <label for="brushSize">太さ</label>
         <input type="range" id="brushSize" min="1" max="50" value="5" />
         <span class="size-value" id="sizeValue">5</span>
       </div>
 
-      <div class="tool-group">
-        <button id="clearBtn">クリア</button>
+      <div class="tool-group buttons">
+        <button id="penBtn" class="active">ペン</button>
+        <button id="eraserBtn" class="sub">消しゴム</button>
+        <button id="undoBtn" class="sub">Undo</button>
+        <button id="saveBtn" class="sub">保存</button>
+        <button id="clearBtn" class="sub">クリア</button>
       </div>
     </div>
 
     <div class="canvas-wrap">
       <canvas id="drawCanvas"></canvas>
-      <div class="note">マウスでもタッチでも描けます</div>
+      <div class="note">マウス・タッチ・ペン入力に対応</div>
     </div>
   </div>
 
@@ -168,25 +239,101 @@
     const colorPicker = document.getElementById("colorPicker");
     const brushSize = document.getElementById("brushSize");
     const sizeValue = document.getElementById("sizeValue");
+
+    const penBtn = document.getElementById("penBtn");
+    const eraserBtn = document.getElementById("eraserBtn");
+    const undoBtn = document.getElementById("undoBtn");
+    const saveBtn = document.getElementById("saveBtn");
     const clearBtn = document.getElementById("clearBtn");
 
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
+    let currentTool = "pen";
+
+    const history = [];
+    const MAX_HISTORY = 30;
+
+    function setContextStyle() {
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = Number(brushSize.value);
+
+      if (currentTool === "pen") {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = colorPicker.value;
+      } else if (currentTool === "eraser") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      }
+    }
+
+    function fillCanvasWhite() {
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+
+    function saveHistory() {
+      if (history.length >= MAX_HISTORY) {
+        history.shift();
+      }
+      history.push(canvas.toDataURL("image/png"));
+    }
+
+    function restoreFromDataUrl(dataUrl) {
+      const image = new Image();
+      image.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        fillCanvasWhite();
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        setContextStyle();
+      };
+      image.src = dataUrl;
+    }
+
+    function undo() {
+      if (history.length <= 1) return;
+
+      history.pop();
+      const previousState = history[history.length - 1];
+      restoreFromDataUrl(previousState);
+    }
+
+    function updateToolButtons() {
+      if (currentTool === "pen") {
+        penBtn.classList.add("active");
+        eraserBtn.classList.remove("active");
+      } else {
+        eraserBtn.classList.add("active");
+        penBtn.classList.remove("active");
+      }
+    }
+
+    function setTool(tool) {
+      currentTool = tool;
+      setContextStyle();
+      updateToolButtons();
+    }
 
     function resizeCanvas() {
+      const oldImage = canvas.toDataURL("image/png");
       const rect = canvas.getBoundingClientRect();
 
       canvas.width = rect.width;
       canvas.height = rect.height;
 
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      fillCanvasWhite();
+      setContextStyle();
 
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = colorPicker.value;
-      ctx.lineWidth = Number(brushSize.value);
+      const image = new Image();
+      image.onload = () => {
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        setContextStyle();
+      };
+      image.src = oldImage;
     }
 
     function getCanvasPosition(e) {
@@ -203,15 +350,15 @@
       const pos = getCanvasPosition(e);
       lastX = pos.x;
       lastY = pos.y;
+
+      saveHistory();
     }
 
     function draw(e) {
       if (!isDrawing) return;
 
       const pos = getCanvasPosition(e);
-
-      ctx.strokeStyle = colorPicker.value;
-      ctx.lineWidth = Number(brushSize.value);
+      setContextStyle();
 
       ctx.beginPath();
       ctx.moveTo(lastX, lastY);
@@ -223,39 +370,87 @@
     }
 
     function stopDrawing() {
+      if (!isDrawing) return;
       isDrawing = false;
     }
 
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      fillCanvasWhite();
+      setContextStyle();
+      saveHistory();
+    }
+
+    function saveImage() {
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download = "oekaki.png";
+      link.click();
+    }
+
     colorPicker.addEventListener("input", () => {
-      ctx.strokeStyle = colorPicker.value;
+      setContextStyle();
     });
 
     brushSize.addEventListener("input", () => {
       sizeValue.textContent = brushSize.value;
-      ctx.lineWidth = Number(brushSize.value);
+      setContextStyle();
+    });
+
+    penBtn.addEventListener("click", () => {
+      setTool("pen");
+    });
+
+    eraserBtn.addEventListener("click", () => {
+      setTool("eraser");
+    });
+
+    undoBtn.addEventListener("click", () => {
+      undo();
+    });
+
+    saveBtn.addEventListener("click", () => {
+      saveImage();
     });
 
     clearBtn.addEventListener("click", () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      clearCanvas();
     });
 
     canvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
       startDrawing(e);
     });
 
     canvas.addEventListener("pointermove", (e) => {
+      e.preventDefault();
       draw(e);
     });
 
-    canvas.addEventListener("pointerup", stopDrawing);
+    canvas.addEventListener("pointerup", (e) => {
+      e.preventDefault();
+      stopDrawing();
+    });
+
     canvas.addEventListener("pointerleave", stopDrawing);
     canvas.addEventListener("pointercancel", stopDrawing);
 
     window.addEventListener("resize", resizeCanvas);
 
-    resizeCanvas();
+    function init() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      fillCanvasWhite();
+      setContextStyle();
+      updateToolButtons();
+      sizeValue.textContent = brushSize.value;
+      saveHistory();
+    }
+
+    init();
   </script>
 </body>
 </html>
