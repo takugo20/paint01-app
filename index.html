@@ -103,23 +103,31 @@
       height: 56px;
       border: none;
       border-radius: 14px;
-      background: #4f46e5;
+      background: #64748b;
       color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
-      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.22);
-      transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+      box-shadow: 0 4px 10px rgba(100, 116, 139, 0.22);
+      transition:
+        transform 0.12s ease,
+        opacity 0.12s ease,
+        background 0.12s ease,
+        box-shadow 0.12s ease,
+        outline 0.12s ease;
+      outline: 0 solid transparent;
     }
 
     .icon-btn:hover {
-      opacity: 0.92;
+      opacity: 0.94;
     }
 
     .icon-btn:active {
-      transform: scale(0.96);
+      transform: scale(0.94);
+      background: #334155;
+      box-shadow: 0 2px 6px rgba(51, 65, 85, 0.28);
     }
 
     .icon-btn svg {
@@ -134,13 +142,12 @@
     }
 
     .icon-btn.active {
-      background: #111827;
-      box-shadow: 0 4px 10px rgba(17, 24, 39, 0.25);
+      background: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2), 0 6px 14px rgba(37, 99, 235, 0.28);
     }
 
-    .icon-btn.sub {
-      background: #64748b;
-      box-shadow: 0 4px 10px rgba(100, 116, 139, 0.22);
+    .icon-btn.active:active {
+      background: #1d4ed8;
     }
 
     .canvas-wrap {
@@ -154,14 +161,6 @@
       flex-direction: column;
       overflow: hidden;
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
-    }
-
-    .canvas-info {
-      text-align: center;
-      font-size: 13px;
-      color: #555;
-      margin-bottom: 10px;
-      line-height: 1.6;
     }
 
     .viewport {
@@ -245,10 +244,6 @@
       .icon-btn {
         height: 50px;
       }
-
-      .canvas-info {
-        font-size: 12px;
-      }
     }
   </style>
 </head>
@@ -270,28 +265,31 @@
 
       <div class="tool-group">
         <div class="icon-buttons">
-          <button id="penBtn" class="icon-btn active" aria-label="ペン" title="ペン">
+          <button id="penBtn" class="icon-btn" aria-label="ペン" title="ペン">
             <svg viewBox="0 0 24 24">
               <path d="M4 20l4.5-1 9-9-3.5-3.5-9 9L4 20z"></path>
               <path d="M13.5 5.5l3.5 3.5"></path>
             </svg>
           </button>
 
-          <button id="eraserBtn" class="icon-btn sub" aria-label="消しゴム" title="消しゴム">
+          <button id="eraserBtn" class="icon-btn" aria-label="消しゴム" title="消しゴム">
             <svg viewBox="0 0 24 24">
-              <path d="M7 15l7.8-7.8a2 2 0 0 1 2.8 0l1.2 1.2a2 2 0 0 1 0 2.8L13 17"></path>
-              <path d="M7 15l-1.6 1.6a2 2 0 0 0 0 2.8l.2.2A2 2 0 0 0 7 20h10"></path>
+              <path d="M3.5 14.5l7.8-7.8a2.2 2.2 0 0 1 3.1 0l4.9 4.9a2.2 2.2 0 0 1 0 3.1l-4.3 4.3H8.2L3.5 14.5z"></path>
+              <path d="M12.2 19H20.5"></path>
+              <path d="M9.3 9.7l5 5"></path>
             </svg>
           </button>
 
-          <button id="undoBtn" class="icon-btn sub" aria-label="Undo" title="Undo">
+          <button id="undoBtn" class="icon-btn" aria-label="Undo" title="Undo">
             <svg viewBox="0 0 24 24">
-              <path d="M9 7H4v5"></path>
-              <path d="M4 12c2.2-3.7 5.2-5 9-5 4.4 0 7 2.6 7 7"></path>
+              <path d="M9 8H4"></path>
+              <path d="M4 8l3-3"></path>
+              <path d="M4 8l3 3"></path>
+              <path d="M9 8h5a6 6 0 1 1 0 12h-6"></path>
             </svg>
           </button>
 
-          <button id="loadBtn" class="icon-btn sub" aria-label="画像読込" title="画像読込">
+          <button id="loadBtn" class="icon-btn" aria-label="画像読込" title="画像読込">
             <svg viewBox="0 0 24 24">
               <path d="M12 16V5"></path>
               <path d="M8 9l4-4 4 4"></path>
@@ -299,7 +297,7 @@
             </svg>
           </button>
 
-          <button id="saveBtn" class="icon-btn sub" aria-label="保存" title="保存">
+          <button id="saveBtn" class="icon-btn" aria-label="保存" title="保存">
             <svg viewBox="0 0 24 24">
               <path d="M6 4h9l3 3v13H6z"></path>
               <path d="M9 4v6h6V4"></path>
@@ -307,7 +305,7 @@
             </svg>
           </button>
 
-          <button id="clearBtn" class="icon-btn sub" aria-label="クリア" title="クリア">
+          <button id="clearBtn" class="icon-btn" aria-label="クリア" title="クリア">
             <svg viewBox="0 0 24 24">
               <path d="M4 7h16"></path>
               <path d="M9 7V5h6v2"></path>
@@ -319,11 +317,6 @@
     </div>
 
     <div class="canvas-wrap">
-      <div class="canvas-info">
-        1本指 / マウスで描画<br />
-        2本指でピンチ拡大縮小・2本指ドラッグで移動
-      </div>
-
       <div id="viewport" class="viewport">
         <div id="stage" class="stage">
           <canvas id="drawCanvas"></canvas>
@@ -518,7 +511,6 @@
         nextScale = clampScale(gestureStartScale * (currentDistance / gestureStartDistance));
       }
 
-      const viewportRect = viewport.getBoundingClientRect();
       const centerMoveX = center.x - gestureStartCenterX;
       const centerMoveY = center.y - gestureStartCenterY;
 
@@ -532,10 +524,6 @@
         gestureStartTranslateY +
         centerMoveY +
         (gestureStartCanvasY * gestureStartScale - gestureStartCanvasY * scale);
-
-      // viewport基準に補正
-      translateX += 0;
-      translateY += 0;
 
       updateTransform();
     }
